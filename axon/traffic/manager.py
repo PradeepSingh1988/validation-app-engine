@@ -22,6 +22,7 @@ class ServerRegistry(object):
     """
     Registry to holds all of the servers running across various namespaces
     """
+
     def __init__(self):
         self.__registry = defaultdict(dict)
         self.lock = threading.RLock()
@@ -83,6 +84,7 @@ class ClientRegistry(object):
     """
     Registry to holds all of the clients running across various namespaces
     """
+
     def __init__(self):
         self.__registry = {}
         self.lock = threading.RLock()
@@ -221,7 +223,7 @@ class RootNsServerManager(ServerManager):
             self.log.info(
                 "Stopping %s server on port %s" % (conf[1], conf[0]))
             try:
-                if server.is_running():
+                if server.is_running:
                     server.stop()
                     self._server_registry.remove_server(
                         self.ROOT_NAMESPACE_NAME, conf[0], conf[1])

@@ -74,6 +74,7 @@ class ConnectedState:
 
 class DBConnectedState(ConnectedState):
     """Stores the connected state in Relational Database"""
+
     def __init__(self):
         self._repository = Repositories()
         self.log = logging.getLogger(__name__)
@@ -204,6 +205,7 @@ class ConnectedStateProcessor(object):
         :type clients: list
         """
         cs = self._connected_state.get_connected_state(endpoint)
+        clients = clients if clients else []
         if not cs:
             self._connected_state.create_connected_state(
                 endpoint, servers, clients)

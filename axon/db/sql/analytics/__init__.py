@@ -21,7 +21,8 @@ else:
    ANALYTICS_DATABASE_URL = "sqlite:///C:\\axon\\analytics.db"
 
 
-ANALYTICS_DATABASE_URL = os.getenv('DATABASE_URL', ANALYTICS_DATABASE_URL)
+ANALYTICS_DATABASE_URL = os.getenv('ANALYTICS_DATABASE_URL',
+                                   ANALYTICS_DATABASE_URL)
 
 
 db_session = scoped_session(sessionmaker(

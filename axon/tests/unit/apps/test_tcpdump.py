@@ -25,10 +25,10 @@ class TestTCPDumpApp(unittest.TestCase):
         """
         """
         _data = [
-                ('p1.pcap', 'eth0', ''),
-                ('p2.pcap', 'l0', ''),
-                ('p3.pcap', 'virbr0', ''),
-                ('p4.pcap', 'eth1', '')]
+            ('p1.pcap', 'eth0', ''),
+            ('p2.pcap', 'l0', ''),
+            ('p3.pcap', 'virbr0', ''),
+            ('p4.pcap', 'eth1', '')]
 
         # start running tcpdump for interfaces
         for dst, interface, args in _data:

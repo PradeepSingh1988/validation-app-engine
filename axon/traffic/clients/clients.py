@@ -3,27 +3,20 @@
 # SPDX-License-Identifier: BSD-2 License
 # The full license information can be found in LICENSE.txt
 # in the root directory of this project.
-
 import abc
 import datetime
-import itertools
 import logging
-import six
 import socket
-from threading import Thread
 import time
+import requests
 
-try:
-    from urllib2 import urlopen
-except ImportError:
-    from urllib.request import urlopen
+from urllib import request
 
 from axon.common.config import PACKET_SIZE
-from axon.traffic.resources import TCPRecord, UDPRecord, HTTPRecord
+from axon.traffic.traffic_objects import TrafficRecord
 
 
-@six.add_metaclass(abc.ABCMeta)
-class Client(object):
+class Client(abc.ABC):
 
     @abc.abstractmethod
     def ping(self):
@@ -43,7 +36,10 @@ class Client(object):
 
 
 class TCPClient(Client):
-    def __init__(self, source, destination, port, record_queue,
+
+    PROTOCOL = "TCP"
+
+    def __init__(self, source, destination, port, metric_cache,
                  connected=True, action=1, request_count=1):
         """
         Client to send TCP requests
@@ -65,7 +61,7 @@ class TCPClient(Client):
         self._port = port
         self._destination = destination
         self._start_time = None
-        self._record_queue = record_queue
+        self._metric_cache = metric_cache
         self._request_count = request_count
         self._connected = connected
         self._action = action
@@ -83,7 +79,7 @@ class TCPClient(Client):
         :rtype: socket object
         """
         sock = socket.socket(address_family, socket_type)
-        sock.settimeout(5)
+        sock.settimeout(10)
         return sock
 
     def __connect(self, sock):
@@ -109,17 +105,19 @@ class TCPClient(Client):
             sock.recv(PACKET_SIZE)
         except Exception as e:
             try:
-                self.log.error("Exception %s for TCP %s -> %s:%s, trying again",
-                               str(e), self._source, self._destination, self._port)
-                time.sleep(1)
+                self.log.error("Exception %s for TCP %s -> "
+                               "%s:%s, trying again",
+                               repr(e), self._source,
+                               self._destination, self._port)
+                time.sleep(.5)
                 sock.send(payload)
                 sock.recv(PACKET_SIZE)
             except Exception:
-                self.log.error("Exception %s for TCP %s -> %s:%s, second try",
-                               str(e), self._source, self._destination, self._port)
+                self.log.error("Exception %s for TCP %s -> "
+                               "%s:%s, second try",
+                               repr(e), self._source,
+                               self._destination, self._port)
                 raise
-        finally:
-            sock.close()
 
     def _get_latency(self):
         """
@@ -128,7 +126,7 @@ class TCPClient(Client):
         :rtype: float
         """
         time_diff = datetime.datetime.now() - self._start_time
-        return time_diff.seconds * 1000 + time_diff.microseconds * .001
+        return int(time_diff.seconds * 1000 + time_diff.microseconds * .001)
 
     def is_traffic_successful(self, success):
         if not bool(self._connected):
@@ -144,44 +142,55 @@ class TCPClient(Client):
         :return: None
         """
         success = self.is_traffic_successful(success)
-        record = TCPRecord(
-            self._source, self._destination, self._port,
-            self._get_latency(),
-            error, success, self._connected)
-        try:
-            self._record_queue.put(record)
-        except Exception:
-            self.log.exception(
-                "Exception in adding TCP record for src {0} "
-                "and dst {1} to traffic queue {2}".format(self._source,
-                                                          self._destination,
-                                                          self._record_queue))
+        metric = TrafficRecord.to_metric(
+            self._source, self._destination, self._port, self.PROTOCOL,
+            self._connected, success)
+        counter = self._metric_cache.counter(metric)
+        counter.inc()
 
     def ping(self):
         payload = 'Dinkirk'.encode()
-        for _ in range(self._request_count):
-            try:
-                self._start_time = datetime.datetime.now()
-                sock = self._create_socket()
-                self.__connect(sock)
-                self._send_receive(sock, payload)
-                self.record()
-            except Exception as e:
-                self.record(success=False, error=str(e))
+        connected = False
+        try:
+
+            for _ in range(self._request_count):
+                try:
+                    sock = self._create_socket()
+                    self._start_time = datetime.datetime.now()
+                    self.__connect(sock)
+                    self._send_receive(sock, payload)
+                    self.record()
+                except Exception as e:
+                    self.record(success=False, error=str(e))
+                finally:
+                    if sock:
+                        sock.close()
+        except Exception as ex:
+            self.log.error("Error %s happened during opening socket" % ex)
 
 
 class UDPClient(TCPClient):
 
+    PROTOCOL = "UDP"
+
     def ping(self):
         payload = 'Dinkirk'.encode()
-        for _ in range(self._request_count):
-            try:
-                self._start_time = datetime.datetime.now()
-                sock = self._create_socket(socket.AF_INET, socket.SOCK_DGRAM)
-                self._send_receive(sock, payload)
-                self.record()
-            except Exception as e:
-                self.record(success=False, error=str(e))
+        try:
+            sock = self._create_socket(socket.AF_INET, socket.SOCK_DGRAM)
+            for _ in range(self._request_count):
+                try:
+                    self._start_time = datetime.datetime.now()
+                    self._send_receive(sock, payload)
+                    self.record()
+                except Exception as e:
+                    self.record(success=False, error=str(e))
+        except Exception as ex:
+            self.log.error(
+                "Error %s happened during creating UDP sockets" %
+                ex)
+        finally:
+            if sock:
+                sock.close()
 
     def _send_receive(self, sock, payload):
         """
@@ -198,127 +207,78 @@ class UDPClient(TCPClient):
             sock.recvfrom(PACKET_SIZE)
         except Exception as e:
             try:
-                self.log.error("Exception %s for UDP %s -> %s:%s, trying again",
-                               str(e), self._source, self._destination, self._port)
-                time.sleep(1)
+                self.log.error("Exception %s for UDP %s -> "
+                               "%s:%s, trying again",
+                               repr(e), self._source,
+                               self._destination, self._port)
+                time.sleep(.5)
                 sock.sendto(payload, (self._destination, self._port))
                 sock.recvfrom(PACKET_SIZE)
             except Exception:
                 self.log.error("Exception %s for UDP %s -> %s:%s, second try",
-                               str(e), self._source, self._destination, self._port)
+                               repr(e), self._source,
+                               self._destination, self._port)
                 raise
-        finally:
-            sock.close()
-
-    def record(self, success=True, error=None):
-        """
-        Record the traffic to data source
-        :return: None
-        """
-        success = self.is_traffic_successful(success)
-        record = UDPRecord(
-            self._source, self._destination, self._port,
-            self._get_latency(), error, success, self._connected)
-        try:
-            self._record_queue.put(record)
-        except Exception:
-            self.log.exception(
-                "Exception in adding UDP record for src {0} "
-                "and dst {1} to traffic queue {2}".format(self._source,
-                                                          self._destination,
-                                                          self._record_queue))
 
 
 class HTTPClient(TCPClient):
 
-    def _send_receive(self):
+    PROTOCOL = "HTTP"
+
+    def _use_urllib(self, url):
+        req = request.Request(url, headers={'Connection': 'close'})
+        result = request.urlopen(req)
+        return result.code
+
+    def _use_session(self, session, url):
+        response = session.get(url)
+        return response.status_code
+
+    def _send_receive(self, session=None):
         url = 'http://%s:%s' % (self._destination, self._port)
         status = None
+
+        def get_response():
+            if session:
+                return self._use_session(session, url)
+            else:
+                return self._use_urllib(url)
         try:
-            status = urlopen(url).code
+            status = get_response()
             if status != 200:
-                raise Exception(
-                    "HTTP Request failed with status %s" % status)
+                raise Exception("HTTP Request failed with status %s" % status)
         except Exception as e:
             if status:
                 raise
             try:
-                self.log.error("Exception %s for HTTP %s -> %s:%s, trying again",
-                               str(e), self._source, self._destination, self._port)
+                self.log.error("Exception %s for HTTP %s "
+                               "-> %s:%s, trying again",
+                               str(e), self._source,
+                               self._destination, self._port)
                 time.sleep(1)
-                status = urlopen(url).code
-                if status != 200:
+                status = get_response()
+                if status.code != 200:
                     raise Exception(
                         "HTTP Request failed with status %s" % status)
             except Exception:
-                self.log.error("Exception %s for HTTP %s -> %s:%s, second try",
-                               str(e), self._source, self._destination, self._port)
+                self.log.error("Exception %s for HTTP %s ->"
+                               " %s:%s, second try",
+                               str(e), self._source,
+                               self._destination, self._port)
                 raise
 
-    def record(self, success=True, error=None):
-        """
-        Record the traffic to data source
-        :return: None
-        """
-        success = self.is_traffic_successful(success)
-        record = HTTPRecord(
-            self._source, self._destination, self._port,
-            self._get_latency(), error, success, self._connected)
-        try:
-            self._record_queue.put(record)
-        except Exception:
-            self.log.exception(
-                "Exception in adding HTTP record for src {0} "
-                "and dst {1} to traffic queue {2}".format(self._source,
-                                                          self._destination,
-                                                          self._record_queue))
-
     def ping(self):
+        session = requests.Session() if self._request_count > 1 else None
         for _ in range(self._request_count):
             try:
                 self._start_time = datetime.datetime.now()
-                self._send_receive()
+                self._send_receive(session)
                 self.record()
             except Exception as e:
                 self.record(success=False, error=str(e))
+        if session:
+            session.close()
 
 
-class TrafficClient(object):
-
-    def __init__(self, src, destinations, record_queue, request_rate=100):
-        self._src = src
-        self._request_rate = min(request_rate, len(destinations))
-        self._destinations = itertools.cycle(destinations)
-        self._record_queue = record_queue
-
-    def _send_traffic(self):
-        threads = []
-
-        for _ in range(self._request_rate):
-            protocol, port, endpoint, connected, action = \
-                next(self._destinations)
-            if protocol == "TCP":
-                client = TCPClient(
-                    self._src, endpoint, port, self._record_queue,
-                    connected, action)
-            elif protocol == "UDP":
-                client = UDPClient(
-                    self._src, endpoint, port, self._record_queue,
-                    connected, action)
-            elif protocol == "HTTP":
-                client = HTTPClient(
-                    self._src, endpoint, port, self._record_queue,
-                    connected, action)
-            else:
-                raise RuntimeError("Invalid protocol name %s" % protocol)
-            thread = Thread(target=client.ping)
-            thread.daemon = True
-            thread.start()
-            threads.append(thread)
-        for thread in threads:
-            thread.join()
-
-    def run(self):
-        while True:
-            self._send_traffic()
-            time.sleep(5)
+class TrafficClient():
+    pass

@@ -15,6 +15,7 @@ class TestNamespaceApp(test_base.BaseTestCase):
     """
         Unit Tests for NameSpaceApp utilities
     """
+
     def setUp(self):
         super(TestNamespaceApp, self).setUp()
         self._namespace_app = NamespaceApp()

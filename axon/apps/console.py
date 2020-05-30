@@ -18,16 +18,16 @@ as remote endpoints can run malicious commands using the exposed interface.
 import logging
 import os
 import shlex
-import signal
 import subprocess
 import time
 
-from axon.apps.base import BaseApp
+from axon.apps.base import app_registry, exposed, exposify, StateLessBaseApp
 
 log = logging.getLogger(__name__)
 
 
-class Console(BaseApp):
+@exposify
+class Console(StateLessBaseApp):
     NAME = "CONSOLE"
 
     def __init__(self):
@@ -36,6 +36,7 @@ class Console(BaseApp):
         """
         pass
 
+    @exposed
     def run_command(self, cmnd, env=None, cwd=None, timeout=-1):
         """
         This function runs the command "cmnd" and returns the return code and
@@ -106,3 +107,6 @@ class Console(BaseApp):
         Returns True if subprocess is still running else False
         """
         return proc.poll() is None
+
+
+app_registry[Console.NAME] = Console

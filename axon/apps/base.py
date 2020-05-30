@@ -8,7 +8,13 @@
 Base class for all Apps on the platform.
 '''
 
-class BaseApp(object):
+import abc
+from functools import wraps
+
+app_registry = {}
+
+
+class BaseApp(abc.ABC):
 
     NAME = ''
 
@@ -20,3 +26,31 @@ class BaseApp(object):
         assert self.NAME, "Invalid Name for app"
         return self.NAME
 
+    @abc.abstractmethod
+    def initialize(self):
+        pass
+
+    @abc.abstractmethod
+    def shutdown(self):
+        pass
+
+
+class StateLessBaseApp(BaseApp):
+
+    def initialize(self):
+        pass
+
+    def shutdown(self):
+        pass
+
+
+class exposed(object):
+    def __init__(self, func):
+        self.func = func
+
+
+def exposify(cls):
+    for k, v in list(cls.__dict__.items()):
+        if isinstance(v, exposed):
+            setattr(cls, "exposed_%s" % (k,), v.func)
+    return cls

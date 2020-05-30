@@ -24,6 +24,7 @@ class TestBasicTrafficController(test_base.BaseTestCase):
     """
     Test for Basic Traffic Controller utilities
     """
+
     def setUp(self):
         super(TestBasicTrafficController, self).setUp()
         self.traffic_controller = BasicTrafficController()

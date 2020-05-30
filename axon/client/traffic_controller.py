@@ -57,4 +57,4 @@ class TrafficRecord(object):
 
     def as_dict(self):
         return dict(list(zip(['endpoint', 'servers', 'clients'],
-                        [self._endpoint, self._servers, self._clients])))
+                             [self._endpoint, self._servers, self._clients])))

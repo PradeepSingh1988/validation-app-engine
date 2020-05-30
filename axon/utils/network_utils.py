@@ -22,6 +22,7 @@ class Namespace(object):
     """
     Namespace object which holds information name, id, interfaces inside
     """
+
     def __init__(self, name, id=None):
         self._name = name
         self._id = id
@@ -41,9 +42,8 @@ class Namespace(object):
         return self._interface_list
 
     def as_dict(self):
-        return dict(list(zip(['name', 'id', 'interfaces'],
-                        [self.name, self.id, [interface.as_dict() for
-                                              interface in self.interfaces]])))
+        return dict(list(zip(['name', 'id', 'interfaces'], [self.name, self.id, [
+                    interface.as_dict() for interface in self.interfaces]])))
 
     def _discover_interfaces(self):
         ns_path = '/var/run/netns/%s' % self.name
@@ -133,6 +133,7 @@ class Interface(object):
     """
     Interface object which holds all the information related to interface
     """
+
     def __init__(self, name, address, family, netmask, broadcast):
         self._name = name
         self._address = address
@@ -162,14 +163,15 @@ class Interface(object):
 
     def as_dict(self):
         return dict(list(zip(['name', 'address', 'family', 'netmask', 'broadcast'],
-                        [self.name, self.address, self.family, self.netmask,
-                         self.broadcast])))
+                             [self.name, self.address, self.family, self.netmask,
+                              self.broadcast])))
 
 
 class InterfaceManager(object):
     """
     Class that controls all Interface information on host
     """
+
     def __init__(self):
         self._interface_map = {}
         self._discover_interfaces()

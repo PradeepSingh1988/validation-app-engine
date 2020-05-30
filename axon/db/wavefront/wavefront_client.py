@@ -137,9 +137,9 @@ class WavefrontClient(object):
                 continue
             metric = prefix + key
             self._client.send_metric(
-                    name=metric, value=val,
-                    timestamp=record.timestamp,
-                    source=conf.WAVEFRONT_SOURCE_TAG, tags=tags)
+                name=metric, value=val,
+                timestamp=record.timestamp,
+                source=conf.WAVEFRONT_SOURCE_TAG, tags=tags)
 
     def create_latency_stats(self, latency_sum, samples, created):
         latency_stats = LatencyStats(

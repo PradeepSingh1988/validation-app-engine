@@ -192,6 +192,7 @@ class AxonRootNamespaceClientAgent(object):
     """
     Launch Servers in Root Namespace
     """
+
     def __init__(self, record_queue):
         self.mngrs_map = {}
         self.connected_state = ConnectedStateProcessor(DBConnectedState())

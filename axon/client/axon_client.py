@@ -115,30 +115,6 @@ class InterfaceManager(Manager):
         return self._client.interface.get_interface(name)
 
 
-class ResourceMonitorManager(Manager):
-
-    def start(self):
-        self._client.monitor.start()
-
-    def stop(self):
-        self._client.monitor.stop()
-
-    def is_running(self):
-        return self._client.monitor.is_running()
-
-
-class TCPDumpManager(Manager):
-
-    def start_pcap(self, dst_file, interface='eth0', args=''):
-        self._client.tcpdump.start_pcap(dst_file, interface, args)
-
-    def stop_pcap(self, dst_file):
-        self._client.tcpdump.stop_pcap(dst_file)
-
-    def is_running(self, dst_file):
-        return self._client.tcpdump.is_running(dst_file)
-
-
 class AxonClient(object):
     """
     Top level object to access Axon API
@@ -170,8 +146,6 @@ class AxonClient(object):
         self.stats = StatsManager(self.rpc_client.root)
         self.namespace = NamespaceManager(self.rpc_client.root)
         self.interface = InterfaceManager(self.rpc_client.root)
-        self.monitor = ResourceMonitorManager(self.rpc_client.root)
-        self.pcap = TCPDumpManager(self.rpc_client.root)
 
     def _connect(self, retry_count, sleep_interval, request_timeout):
 
