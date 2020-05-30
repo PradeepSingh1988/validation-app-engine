@@ -22,7 +22,7 @@ class StatsApp(object):
         return start_time, end_time
 
     def _set_scope(self, start_time=None, end_time=None,
-                  destination=None, port=None, source=None):
+                   destination=None, port=None, source=None):
         start_time, end_time = self._set_time_range(start_time, end_time)
         filters = {}
         if port:
@@ -47,7 +47,6 @@ class StatsApp(object):
         with session_scope() as session:
             return self._repository.latency.get_latency_stats(
                 session, start_time, end_time)
-
 
     def get_failure_count(self, start_time=None, end_time=None,
                           destination=None, port=None, source=None):

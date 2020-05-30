@@ -69,13 +69,18 @@ def as_list(obj, tuple_to_list=False, if_none=NotImplemented):
             # Here NotImplemented is a magic value indicating
             # no-special casing, we will return [None]
             pass
-        elif type(if_none) == type and issubclass(if_none, Exception):
+        elif isinstance(if_none, type) and issubclass(if_none, Exception):
             # Note that issubclass raises a TypeError if a non-class is
             # passed in, thus we have to check the type first
             raise if_none("as_list received None as input")
         else:
             return if_none
-    if not hasattr(obj, '__iter__') or (tuple_to_list and type(obj) is tuple):
+    if not hasattr(
+        obj,
+        '__iter__') or (
+        tuple_to_list and isinstance(
+            obj,
+            tuple)):
         obj = [obj]
     return obj
 

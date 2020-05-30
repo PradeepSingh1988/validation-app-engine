@@ -61,7 +61,7 @@ class WorkerThread(Thread, Worker):
             self._log.info("Starting thread with args %s %s %s" %
                            (self.__traffic_class, self.__class_args,
                             self.__class_kwargs))
-            self.__traffic_obj = self._traffic_class(
+            self.__traffic_obj = self.__traffic_class(
                 *self.__class_args, **self.__class_kwargs)
             self.__traffic_obj.run()
         except Exception:
@@ -74,7 +74,7 @@ class WorkerThread(Thread, Worker):
         self.__traffic_obj.stop()
 
     def is_running(self):
-        return self.isAlive()
+        return self.is_alive()
 
 
 class WorkerProcess(mp.Process, Worker):
@@ -106,6 +106,7 @@ class WorkerProcess(mp.Process, Worker):
                                  self.__class_kwargs))
 
     def stop(self):
+        print("terminating process")
         self.terminate()
 
     def is_running(self):

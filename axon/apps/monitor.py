@@ -9,19 +9,23 @@
 """
 import logging
 import os
+import psutil
 import queue
 import threading
 import time
 
-import psutil
-
-from axon.apps.base import BaseApp
+from axon.apps.base import app_registry, exposed, exposify, BaseApp
 from axon.db.record import ResourceRecord
+
 
 log = logging.getLogger(__name__)
 
 
+@exposify
 class ResourceMonitor(BaseApp):
+
+    NAME = 'RESOURCE_MONITOR'
+
     def __init__(self, rqueue, interval=3, proc_name='runner'):
         """
         A simple resource monitor that writes cpu / memory percentage
@@ -36,6 +40,8 @@ class ResourceMonitor(BaseApp):
     def _run(self):
         p = psutil.Process(os.getpid())
         while self._switch.is_set():
+            t = int(time.time())
+
             sys_cpu_percent = round(psutil.cpu_percent(), 2)
             sys_mem_percent = round(psutil.virtual_memory().percent, 2)
             sys_net_conns = int(len(psutil.net_connections()))
@@ -56,12 +62,14 @@ class ResourceMonitor(BaseApp):
 
             time.sleep(self._interval)
 
+    @exposed
     def is_running(self):
         """
         Returns True if Rescoures are being monitored else False.
         """
         return self._thread and self._thread.is_alive()
 
+    @exposed
     def stop(self):
         """
         Stops Resource Monitoring.
@@ -70,8 +78,8 @@ class ResourceMonitor(BaseApp):
         if self.is_running():
             self._thread.join()
             self._thread = None
-        log.info("Stopped resource monitoring.")
 
+    @exposed
     def start(self):
         """
         Starts Resource monitoring (in a separate thread)
@@ -81,4 +89,12 @@ class ResourceMonitor(BaseApp):
             self._thread = threading.Thread(target=self._run)
             self._thread.setDaemon(True)
             self._thread.start()
-        log.info("Started resource monitoring.")
+
+    def initialize(self):
+        self.start()
+
+    def shutdown(self):
+        self.stop()
+
+
+app_registry[ResourceMonitor.NAME] = ResourceMonitor

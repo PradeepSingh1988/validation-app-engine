@@ -9,6 +9,7 @@ App for running tcpdump tool and generating .pcap files.
 import logging
 import os
 
+from axon.apps.base import app_registry, exposed, exposify
 import axon.apps.console as console
 
 
@@ -19,10 +20,12 @@ class TCPDumpRerunError(Exception):
     pass
 
 
+@exposify
 class TCPDump(console.Console):
 
+    NAME = "TCPDUMP"
+
     def __init__(self):
-        super(TCPDump, self).__init__()
         self._pcap_handles = {}  # a <str: subprocess.Popen> pair
 
     def _get_identifier(self, dst_file):
@@ -40,22 +43,21 @@ class TCPDump(console.Console):
         dst_file = self._get_identifier(dst_file)
         return self._pcap_handles.get(dst_file, None)
 
+    @exposed
     def start_pcap(self, dst_file, interface='eth0', args=''):
         """
         Starts Packet Capture with 'tcpdump' command for given params.
         """
         if self._get_pcap_handle(dst_file):
             msg = "A tcpdump directing to %s is already running" % dst_file
-            log.error(msg)
             raise TCPDumpRerunError(msg)
 
-        _dst_file = self._get_identifier(dst_file)
-        cmnd = 'tcpdump -i %s %s -w %s' % (interface, args, _dst_file)
+        dst_file = self._get_identifier(dst_file)
+        cmnd = 'tcpdump -i %s %s -w %s' % (interface, args, dst_file)
         p = self._start_subprocess(cmnd)
-        self._pcap_handles[_dst_file] = p
-        log.info("Started Packet capture for %s at %s", dst_file, _dst_file)
-        return True
+        self._pcap_handles[dst_file] = p
 
+    @exposed
     def stop_pcap(self, dst_file):
         """
         Stops packet capture for the destination file `dst_file`.
@@ -64,20 +66,15 @@ class TCPDump(console.Console):
         proc = self._get_pcap_handle(ident)
         if proc:
             self._kill_subprocess(proc)
-            self._pcap_handles.pop(ident)
-            msg = ("Stopped Packet capture for %s. Result is available"
-                   " at %s." % (dst_file, ident))
-            log.info(msg)
-        else:
-            msg = ("No PCAP handle found for %s" % dst_file)
-            log.warn(msg)
-        return msg
+            self._get_pcap_handles.pop(ident)
 
+    @exposed
     def is_running(self, dst_file):
         ident = self._get_identifier(dst_file)
         proc = self._get_pcap_handle(ident)
         return self._is_alive(proc)
 
+    @exposed
     def stop(self):
         """
         Stops PCAP app.
@@ -85,3 +82,6 @@ class TCPDump(console.Console):
         for ident, proc in self._pcap_handles.items():
             log.info("Stopping packet capture for %s", ident)
             self._kill_subprocess(proc, close_fds=True)
+
+
+app_registry[TCPDump.NAME] = TCPDump

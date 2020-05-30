@@ -14,6 +14,7 @@ from axon.db.record_count import SqlRecordCountHandler, \
     WavefrontRecordCountHandler
 from axon.db.record import ResourceRecord
 
+
 class RecordHandler(object):
 
     def __init__(self):
@@ -34,7 +35,7 @@ class RecordHandler(object):
     def record_resource(self, record):
         msg = ("Handling of resource record is not supported on this"
                " type of recorder. Record - {%s}" % record)
-        if not self._warned:    #TODO : get this away
+        if not self._warned:  # TODO : get this away
             self.log.warn(msg)
             self._warned = True
 

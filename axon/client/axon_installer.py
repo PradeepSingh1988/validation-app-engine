@@ -15,6 +15,7 @@ class AxonRemoteOperation(object):
     """
     Base class for all Axon(Windows/Linux) operations.
     """
+
     def __init__(self, remote_host, remote_user=None, remote_password=None,
                  gw_host=None, gw_user=None, gw_password=None,
                  pypi_server=None, pypi_server_port=None):
@@ -174,6 +175,7 @@ class AxonRemoteOperationWindows(AxonRemoteOperation):
         At a time only one of above procedure needs to be followed.
 
     """
+
     def remote_install_sdist(self, sdist_package_path):
         """
         Remotely upload previously created axon_service.exe from local host
@@ -298,6 +300,7 @@ class AxonRemoteOperationLinux(AxonRemoteOperation):
         - Stops axon service remotely.
         - Restart axon service remotely.
     """
+
     def remote_install_sdist(self, sdist_package_path):
         """
         Remotely upload previously created axon_service.exe from local host

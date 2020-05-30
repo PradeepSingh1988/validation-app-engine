@@ -67,8 +67,8 @@ class BaseModel(object):
     def to_dict(self):
         intersection = set(self.__table__.columns.keys()) & set(self.FIELDS)
         return dict([(key,
-                    (lambda value: self.FIELDS[key](value) if value is not
-                     None else None)
-                    (getattr(self, key))) for key in intersection])
+                      (lambda value: self.FIELDS[key](value) if value is not
+                       None else None)
+                      (getattr(self, key))) for key in intersection])
 
     FIELDS = {}

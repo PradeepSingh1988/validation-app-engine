@@ -18,7 +18,6 @@ class RecorderFactory(object):
                 token = conf.WAVEFRONT_SERVER_API_TOKEN
             return WaveFrontRecorder(server, proxy, token)
 
-
         if not conf.RECORDER:   # no recorder specified
             return [SqlDbRecorder()]
 

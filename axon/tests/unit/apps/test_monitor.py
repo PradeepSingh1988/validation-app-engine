@@ -20,7 +20,7 @@ class TestResourceMonitorApp(unittest.TestCase):
         self._monitor = ResourceMonitor(rqueue=self._rq)
 
     def test_resource_monitor(self):
-        self._monitor.start() # start monitoring
+        self._monitor.start()  # start monitoring
 
         time.sleep(10)
         self._monitor.stop()  # stop monitoring

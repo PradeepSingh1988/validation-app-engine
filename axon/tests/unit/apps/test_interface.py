@@ -15,6 +15,7 @@ class TestInterfaceApp(test_base.BaseTestCase):
     """
         Unit Tests for InterfaceApp utilities
     """
+
     def setUp(self):
         super(TestInterfaceApp, self).setUp()
         self.interface = {'bridge0': [snicaddr(

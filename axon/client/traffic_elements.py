@@ -190,11 +190,15 @@ class TrafficRule(object):
             # A rule must have destination endpoint , protocol and port.
             assert src or dst, "At least src or dst must not be None."
             if src is not None:
-                assert(isinstance(src, Endpoint) or
-                       isinstance(src, EndpointList)), "src must be instance of EndPoint"
+                assert(
+                    isinstance(
+                        src, Endpoint) or isinstance(
+                        src, EndpointList)), "src must be instance of EndPoint"
             if dst is not None:
-                assert(isinstance(dst, Endpoint) or
-                    isinstance(dst, EndpointList)), "dst must be instance of EndPoint"
+                assert(
+                    isinstance(
+                        dst, Endpoint) or isinstance(
+                        dst, EndpointList)), "dst must be instance of EndPoint"
             assert(isinstance(port, Port)), "port must be instance of Port"
             assert(action in Action.allowed), "Invalid Action"
             assert (connected in Connected.allowed), "Invalid Connected"

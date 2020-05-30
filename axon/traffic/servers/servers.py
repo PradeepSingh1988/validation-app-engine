@@ -3,206 +3,107 @@
 # SPDX-License-Identifier: BSD-2 License
 # The full license information can be found in LICENSE.txt
 # in the root directory of this project.
-
-import abc
+import asyncio
 import os
-import signal
-import six
-from six.moves import socketserver
-import subprocess
-from six.moves.BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
-
-from axon.common.config import REQUEST_QUEUE_SIZE, PACKET_SIZE,\
-    ALLOW_REUSE_ADDRESS
+import ssl
 
 
-class HTTPRequestHandler(BaseHTTPRequestHandler):
-    """
-    Handle to handle HTTP Request
-    """
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        message = "Hello From AXON HTTP Server \n"
-        self.wfile.write(message.encode('utf-8'))
-        return
-
-    def log_message(self, format, *args):
-        return
+DEFAULT_HTTP_RESPONSE = b"Hello From Axon"
+SERVER_CERT_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), 'axon.crt')
+SERVER_KEY_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), 'axon.key')
 
 
-class TCPRequestHandler(socketserver.BaseRequestHandler):
-    """
-    Handler for TCP Requests.
-    If we are using ThreadedTCPServer with the help of
-    SocketServer.ThreadingMixIn feature, every TCP request will
-    be handled in single thread.
-    """
+class HTTPProtocol(asyncio.Protocol):
+    
+    def connection_made(self, transport):
+        # peername = transport.get_extra_info('peername')
+        # print('Connection from {}'.format(peername))
+        self.transport = transport
 
-    def handle(self):
-        data = self.request.recv(PACKET_SIZE)
-        self.request.send(data)
+    def data_received(self, data):
+        request_lines = data.decode().split("\n")
+        try:
+            method, path, proto = request_lines[0].split()
+            if method == 'GET':
+                self.start_response()
+                self.transport.write(DEFAULT_HTTP_RESPONSE)
+            else:
+                self.start_response(status=b"405")
+                self.transport.write(b"405\r\n")
+        except Exception as e:
+            print(e)
+        self.transport.close()
 
-
-class UDPRequestHandler(socketserver.BaseRequestHandler):
-    """
-    Handler for UDP Requests.
-    If we are using ThreadedUDPServer with the help of
-    SocketServer.ThreadingMixIn feature, every UDP request will
-    be handled in single thread.
-    """
-
-    def handle(self):
-        data = self.request[0].strip()
-        socket = self.request[1]
-        socket.sendto(data, self.client_address)
-
-
-@six.add_metaclass(abc.ABCMeta)
-class Server(object):
-    """
-    Base Server Class
-    """
-
-    @abc.abstractmethod
-    def run(self):
-        """
-        Start A Server
-        :return: None
-        """
-        pass
-
-    @abc.abstractmethod
-    def stop(self):
-        """
-        Stop a server
-        :return: None
-        """
-        pass
-
-    @abc.abstractmethod
-    def is_alive(self):
-        """
-        Check if server is running
-        :return: True or False
-        """
-        pass
+    def start_response(
+            self, content_type=b"text/html; charset=utf-8",  status=b"200"):
+        self.transport.write(b"HTTP/1.0 %b NA\r\n" % status)
+        self.transport.write(b"Content-Type: ")
+        self.transport.write(content_type)
+        self.transport.write(b"\r\n\r\n")
 
 
-class ThreadedTCPServer(socketserver.ThreadingMixIn,
-                        socketserver.TCPServer, Server):
-    """
-    This is a TCP Server which will handle every single client request
-    in separate thread.
-    """
-    allow_reuse_address = ALLOW_REUSE_ADDRESS
-    request_queue_size = REQUEST_QUEUE_SIZE
+class EchoServerProtocol:
+    def connection_made(self, transport):
+        self.transport = transport
 
-    def run(self):
-        self.serve_forever()
-
-    def stop(self):
-        self.shutdown()
-        self.server_close()
-
-    def is_alive(self):
-        pass
+    def datagram_received(self, data, addr):
+        self.transport.sendto(data, addr)
 
 
-class ThreadedHTTPServer(socketserver.ThreadingMixIn, HTTPServer, Server):
-    """Handle requests in a separate thread."""
+class EchoServerClientProtocol(asyncio.Protocol):
+    def connection_made(self, transport):
+        self.transport = transport
 
-    allow_reuse_address = ALLOW_REUSE_ADDRESS
-    request_queue_size = REQUEST_QUEUE_SIZE
-
-    def run(self):
-        self.serve_forever()
-
-    def stop(self):
-        self.shutdown()
-        self.server_close()
-
-    def is_alive(self):
-        pass
+    def data_received(self, data):
+        self.transport.write(data)
+        self.transport.close()
 
 
-class ThreadedUDPServer(socketserver.ThreadingMixIn,
-                        socketserver.UDPServer, Server):
-    """
-    This is a UDP Server which will handle every single client request
-    in separate thread.
-    """
-    allow_reuse_address = ALLOW_REUSE_ADDRESS
-    request_queue_size = REQUEST_QUEUE_SIZE
-
-    def run(self):
-        self.serve_forever()
-
-    def stop(self):
-        self.shutdown()
-        self.server_close()
-
-    def is_alive(self):
-        pass
+def tcp_serve(host, port, loop, reuse_port=True, sock=None, backlog=100):
+    server_coroutine = loop.create_server(
+        EchoServerClientProtocol, host, port,
+        reuse_port=reuse_port, sock=sock, backlog=backlog)
+    return server_coroutine
 
 
-class IperfServer(Server):
-    """
-    Class to manage Iperf Server
-    """
-    def __init__(self, source, protocol, port):
-        self._protocol = protocol
-        self._port = port
-        self._p_child = None
-        self._source = source
-
-    def run(self):
-        command = "iperf3 --server --port %d --bind %s" % \
-                  (self._port, self._source)
-        if self._protocol == "UDP":
-            command += " --u"
-        self._p_child = subprocess.Popen(
-            command, shell=True, stdout=subprocess.PIPE,
-            preexec_fn=os.setsid)
-
-    def stop(self):
-        pid = self._p_child.pid
-        if self.is_alive():
-            os.killpg(os.getpgid(pid), signal.SIGTERM)
-
-    def is_alive(self):
-        return self._p_child.poll() is None
+def udp_serve(host, port, loop, reuse_port=True, sock=None):
+    server_coroutine = loop.create_datagram_endpoint(
+        EchoServerProtocol, local_addr=(host, port),
+        reuse_port=reuse_port, sock=sock)
+    return server_coroutine
 
 
-def create_server_class(protocol, port, source, server_type='socket'):
-    """
-    Create server object
-    :param protocol: protocol on which server works
-    :type protocol: str
-    :param port: port on which server listen
-    :type port: int
-    :param server_type: socket server or iperf server
-    :type server_type: int
-    :return: Server object
-    :rtype: Server
-    """
-    if protocol == "TCP" and server_type == "socket":
-        server_class = ThreadedTCPServer
-        args = ((source, int(port)), TCPRequestHandler)
-        kwargs = {}
-    elif protocol == "UDP" and server_type == "socket":
-        server_class = ThreadedUDPServer
-        args = ((source, int(port)), UDPRequestHandler)
-        kwargs = {}
-    elif server_type == "iperf":
-        server_class = IperfServer
-        args = (source, protocol, port)
-        kwargs = {}
-    elif protocol == 'HTTP':
-        server_class = ThreadedHTTPServer
-        args = ((source, int(port)), HTTPRequestHandler)
-        kwargs = {}
-    else:
-        raise ValueError("Invalid Value (%s, %s, %s) for Server" %
-                         (protocol, port, server_type))
-    return server_class, args, kwargs
+def http_serve(host, port, loop, reuse_port=True, sock=None, backlog=100):
+    server_coroutine = loop.create_server(
+        HTTPProtocol, host, port,
+        reuse_port=reuse_port, sock=sock, backlog=backlog)
+    return server_coroutine
+
+
+def https_serve(host, port, loop, reuse_port=True, sock=None, backlog=100):
+    ssl_cntext = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+    ssl_cntext.load_cert_chain(SERVER_CERT_FILE, SERVER_KEY_FILE)
+    loop.debug = True
+    server_coroutine = loop.create_server(
+        HTTPProtocol, host, port,
+        reuse_port=reuse_port, sock=sock,
+        backlog=backlog, ssl=ssl_cntext)
+    return server_coroutine
+
+
+class ServerFactory(object):
+    def __init__(self, server):
+        print(server)
+
+    @classmethod
+    def create_server(cls, server, loop):
+        if server.protocol == 'TCP':
+            return tcp_serve(server.endpoint, server.port, loop)
+        elif server.protocol == 'UDP':
+            return udp_serve(server.endpoint, server.port, loop)
+        elif server.protocol == 'HTTP':
+            return http_serve(server.endpoint, server.port, loop)
+        elif server.protocol == 'HTTPS':
+            return https_serve(server.endpoint, server.port, loop)

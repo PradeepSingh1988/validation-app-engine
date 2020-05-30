@@ -24,7 +24,7 @@ def register_traffic(register_param):
     rule_list = register_param[1]
     proxy_host = register_param[2]
     with AxonClient(workload_server, proxy_host=proxy_host, retry_count=30,
-                     sleep_interval=1) as client:
+                    sleep_interval=1) as client:
         client.traffic.register_traffic(rule_list)
 
 
@@ -121,6 +121,7 @@ class DataCenterTrafficController(TrafficController):
     """
     This TrafficController deals with On-prem traffic
     """
+
     def __init__(self, gateway_host=None):
         super(DataCenterTrafficController, self).__init__()
         self._gw_host = gateway_host
